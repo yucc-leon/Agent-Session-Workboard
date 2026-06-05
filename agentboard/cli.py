@@ -212,7 +212,21 @@ def web(
         console.print("[bold yellow]🔐 Remote access enabled[/bold yellow]")
         console.print(f"  Bind:  {bind}:{port}")
         console.print(f"  Token: [bold green]{token}[/bold green]")
-        console.print(f"  URL:   http://{bind}:{port}/?token={token}\n")
+        ts_ip = _tailscale_ip()
+        if ts_ip:
+            console.print(
+                f"  [bold]Cross-network URL (Tailscale):[/bold] "
+                f"[green]http://{ts_ip}:{port}/?token={token}[/green]"
+            )
+            console.print("  [dim]Open from your phone on any network "
+                          "(Tailscale must be on both devices).[/dim]")
+        else:
+            lan = _lan_ip()
+            if lan:
+                console.print(f"  [dim]Same-network URL: http://{lan}:{port}/?token={token}[/dim]")
+            console.print("  [dim]Different networks? Install Tailscale here + on your phone "
+                          "for a stable cross-network address.[/dim]")
+        console.print()
     else:
         bind = "127.0.0.1"
         console.print(f"[green]Web hub at http://{bind}:{port}[/green]")
@@ -245,6 +259,35 @@ def _env_key(cfg: Config) -> str:
     import os
 
     return os.environ.get(cfg.llm.api_key_env, "")
+
+
+def _tailscale_ip() -> str | None:
+    """The machine's Tailscale IPv4, if Tailscale is installed and up."""
+    import subprocess
+
+    for cmd in (["tailscale", "ip", "-4"],
+                ["/Applications/Tailscale.app/Contents/MacOS/Tailscale", "ip", "-4"]):
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=3)
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+        if r.returncode == 0 and r.stdout.strip():
+            return r.stdout.strip().splitlines()[0].strip()
+    return None
+
+
+def _lan_ip() -> str | None:
+    """Best-effort primary LAN IP (for same-network access)."""
+    import socket
+
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except OSError:
+        return None
 
 
 def main() -> None:
