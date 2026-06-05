@@ -1,3 +1,10 @@
+> ⚠️ **历史设计文档(v1,已归档)**
+> 这是项目最初的「只读 Workboard」设计稿。项目此后已 pivot 为**交互式控制中枢**
+> (从任何设备驱动本地/远程的 Codex/Claude tmux 会话 + LLM 上下文恢复)。
+> 当前实际形态以仓库根目录的 `README.md` 为准;此文仅作历史记录保留。
+
+---
+
 Agent Session Workboard 项目设计文档
 
 0. 项目一句话目标
@@ -163,7 +170,7 @@ machines:
     tmux: true
 llm:
   provider: openai_compatible
-  model: deepseek-reasoner
+  model: deepseek-v4-flash
   base_url: https://api.deepseek.com
   api_key_env: DEEPSEEK_API_KEY
 redaction:
