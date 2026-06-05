@@ -74,7 +74,9 @@
     }
     return groups.map(g => {
       const who = g.role === 'user' ? 'You' : 'Agent';
-      const body = g.msgs.map(renderParts).join('');
+      // Each constituent message is its own block so a long agent run (dozens of
+      // text/tool steps) stays spaced out and readable, not crammed together.
+      const body = g.msgs.map(m => `<div class="turn-msg">${renderParts(m)}</div>`).join('');
       return `<div class="turn turn-${g.role === 'user' ? 'user' : 'agent'}">`
            + `<div class="turn-role">${who}</div><div class="turn-body">${body}</div></div>`;
     }).join('');

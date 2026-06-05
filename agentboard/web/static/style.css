@@ -1085,3 +1085,9 @@ html, body { max-width: 100%; overflow-x: hidden; }
 .termkeys { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .termkeys .btn { padding: 8px 12px; font-size: 14px; min-width: 44px; }
 #terminal .xterm { height: 100%; }
+
+/* Space out each message within a grouped turn (long agent runs get crowded). */
+.turn-msg + .turn-msg { margin-top: 10px; }
+.turn-agent .turn-msg + .turn-msg {
+    padding-top: 10px; border-top: 1px solid var(--border);
+}
