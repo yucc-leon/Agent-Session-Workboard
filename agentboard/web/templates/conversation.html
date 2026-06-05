@@ -53,8 +53,10 @@ function toast(m){const t=document.createElement('div');t.className='toast';t.te
     document.body.appendChild(t);setTimeout(()=>t.remove(),2000);}
 function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 
+let CURRENT_CARD = null;
 function renderCard(c){
     if(!c)return;
+    CURRENT_CARD = c;
     let h='';
     if(c.title)h+=`<div class="wl-title" style="margin-bottom:8px;">${esc(c.title)}</div>`;
     if(c.summary)h+=`<p style="margin-bottom:10px;">${esc(c.summary)}</p>`;
@@ -66,10 +68,41 @@ function renderCard(c){
         h+='<h2 style="margin-top:12px;">Possibly missed</h2><ul class="avoid-list">';
         c.open_items.forEach(i=>h+=`<li>${esc(i)}</li>`);h+='</ul>';
     }
+    if(c.key_files&&c.key_files.length){
+        h+='<h2 style="margin-top:12px;">Key files</h2><ul>';
+        c.key_files.forEach(f=>h+=`<li><code>${esc(f)}</code></li>`);h+='</ul>';
+    }
+    h+='<div style="margin-top:14px;"><button class="btn" onclick="copyResumePrompt()">📋 Copy resume prompt</button></div>';
     document.getElementById('sum-content').innerHTML=h;
     const e=document.getElementById('sum-empty'); if(e)e.remove();
 }
 if(CARD)renderCard(CARD);
+
+// Assemble a ready-to-paste handoff prompt from the card, for resuming the work
+// in a fresh agent (or your own memory).
+function buildResumePrompt(c){
+    const L=[];
+    L.push('You are resuming a previous coding session. Get oriented from this context, confirm your understanding, then continue.');
+    L.push('');
+    if(c.summary){L.push('## Summary');L.push(c.summary);L.push('');}
+    if(c.current_state){L.push('## Current state');L.push(c.current_state);L.push('');}
+    if(c.next_action){L.push('## Next action');L.push(c.next_action);L.push('');}
+    if(c.open_items&&c.open_items.length){L.push('## Open / possibly-missed items');c.open_items.forEach(i=>L.push('- '+i));L.push('');}
+    if(c.key_files&&c.key_files.length){L.push('## Key files');c.key_files.forEach(f=>L.push('- '+f));L.push('');}
+    return L.join('\n').trim();
+}
+function copyResumePrompt(){
+    if(!CURRENT_CARD){toast('no summary yet');return;}
+    const text=buildResumePrompt(CURRENT_CARD);
+    (navigator.clipboard?navigator.clipboard.writeText(text):Promise.reject())
+        .then(()=>toast('resume prompt copied'))
+        .catch(()=>{
+            // Fallback for non-secure contexts
+            const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);
+            ta.select();try{document.execCommand('copy');toast('copied');}catch(e){toast('copy failed');}
+            ta.remove();
+        });
+}
 
 function genSummary(){
     const b=document.getElementById('sum-btn');

@@ -44,10 +44,13 @@ it got. Distinguish the original goal from the current state.
 mentioned but not done, errors left unaddressed, questions the agent asked that \
 were never answered, follow-ups the user requested mid-stream and may have \
 forgotten. This is the most important field; be thorough but do not invent.
+  "key_files":     a list of file paths central to this work (created, edited, \
+or repeatedly discussed). Paths only, most important first. Empty if none clear.
   "confidence":    0.0-1.0, your confidence in this reading.
 
 Ground everything in the transcript. Do not fabricate. If the transcript is too \
-thin to tell, say so in summary and use empty arrays."""
+thin to tell, say so in summary and use empty arrays. The reader will use this \
+to RESUME the work, so optimize for fast context recovery."""
 
 _MAX_TRANSCRIPT_CHARS = 14000
 
@@ -60,6 +63,7 @@ class SessionCard(BaseModel):
     current_state: str = ""
     next_action: str = ""
     open_items: list[str] = Field(default_factory=list)
+    key_files: list[str] = Field(default_factory=list)
     confidence: float = 0.0
     # cache bookkeeping
     fingerprint: str = ""
@@ -305,6 +309,7 @@ async def summarize_session(
             current_state=str(data.get("current_state", "")).strip(),
             next_action=str(data.get("next_action", "")).strip(),
             open_items=[str(x).strip() for x in (data.get("open_items") or []) if str(x).strip()],
+            key_files=[str(x).strip() for x in (data.get("key_files") or []) if str(x).strip()],
             confidence=float(data.get("confidence", 0.5) or 0.5),
             fingerprint=fingerprint(state),
             generated_at=datetime.now(timezone.utc).isoformat(),
