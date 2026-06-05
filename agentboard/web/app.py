@@ -114,14 +114,23 @@ def create_app(config: Config) -> FastAPI:
         return registry.get(machine, name, refresh=refresh)
 
     def _transcript(session: Session) -> TranscriptState:
-        """Live view of *this* pane via capture-pane.
+        """Clean chat for this pane, parsed from the JSONL it's actually writing.
 
-        We deliberately do NOT guess a JSONL by cwd here: several agents can run
-        in the same directory, and the newest log for that cwd usually belongs to
-        a different pane — which would show a foreign conversation. The pane's
-        own screen is always the truthful live view. Clean JSONL chat is served
-        on the conversation page, where the session id is unambiguous.
+        For a local agent we map the pane to its own transcript precisely via
+        ``lsof`` on the pane's process tree — so this is the real per-pane chat,
+        not a guess-by-cwd (which could show a neighbour's conversation) and not
+        a wasteful constant re-render of the raw TUI. Remote panes, or anything
+        we can't map, fall back to parsing the captured screen.
         """
+        from agentboard.core.sessions import jsonl_for_pid
+        from agentboard.core.transcript import parse_jsonl_file
+
+        if session.machine_type == "local" and session.is_agent and session.pid:
+            path = jsonl_for_pid(session.pid)
+            if path:
+                state = parse_jsonl_file(path, session.cli)
+                if state.messages:
+                    return state
         tmux = registry.tmux_for(session.machine)
         text = tmux.capture(session.name, lines=400) if tmux else ""
         return parse_screen(text)

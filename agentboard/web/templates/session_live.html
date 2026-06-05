@@ -12,22 +12,20 @@
         {{ session.name }}
         <span class="badge source-{{ session.cli }}">{{ session.cli }}</span>
     </h1>
-    <div style="display:flex; gap:8px;">
+    <div class="toolbar">
         <button class="btn" id="kill-btn" onclick="killSession()">🗑 Kill</button>
     </div>
 </div>
-<div class="hint">📁 {{ session.cwd }} · live view of this tmux pane</div>
+<div class="hint">📁 {{ session.cwd }}</div>
 
 {% if not session.is_agent %}
 <div class="warn-banner" id="shell-banner">
-    ⚠ No agent is running in this pane right now — it's at a shell prompt, so a
-    message would be typed into the shell, not an agent. Launch one:
+    ⚠ No agent is running in this pane — a message would go to the shell. Launch one:
     <button class="btn" onclick="launchAgent('codex')">▶ codex</button>
     <button class="btn" onclick="launchAgent('claude')">▶ claude</button>
 </div>
 {% endif %}
 
-<!-- Summary panel (only when AI summaries are on, or one already exists) -->
 {% if summary_enabled or card %}
 <div class="detail-section" id="summary-section">
     <h2 style="display:flex; justify-content:space-between; align-items:center;">
@@ -36,33 +34,39 @@
         <button class="btn" id="sum-btn" onclick="genSummary()" style="text-transform:none; font-size:12px;">↻ Generate</button>
         {% endif %}
     </h2>
-    <div id="summary-body">
-        <div id="sum-content"></div>
-        {% if not card %}
-        <p class="hint" id="sum-empty">Live summaries are based on the current screen.
-           Click <strong>Generate</strong> for a recap.</p>
-        {% endif %}
+    <div id="summary-body"><div id="sum-content"></div>
+        {% if not card %}<p class="hint" id="sum-empty">No summary yet.</p>{% endif %}
     </div>
 </div>
 {% endif %}
 
-<!-- Live terminal (this pane's real screen) -->
-<h2 style="margin:16px 0 8px;">Terminal <span class="hint">— live screen of this pane</span></h2>
-<pre id="terminal" style="background:#000; color:#c9d1d9; padding:12px; border-radius:8px;
-     height:50vh; overflow:auto; white-space:pre-wrap; font-family:monospace;
-     font-size:12px; line-height:1.4;">connecting…</pre>
-<div class="action-bar" style="margin-top:8px;">
-    <button class="btn btn-undo" onclick="sendKey(['C-c'])" title="Interrupt">⎋ Interrupt (Ctrl-C)</button>
-    <button class="btn" onclick="sendKey(['Escape'])">Esc</button>
-    <button class="btn" onclick="sendKey(['Enter'])">↵ Enter</button>
-    <button class="btn" onclick="scrollTermBottom()">⤓ Jump to latest</button>
+<div class="tab-bar">
+    <button class="tab-btn active" data-tab="chat" onclick="switchTab('chat')">💬 Chat</button>
+    <button class="tab-btn" data-tab="term" onclick="switchTab('term')">🖥 Terminal</button>
 </div>
 
-<!-- Input bar -->
+<div class="tab-panel" id="tab-chat">
+    <div id="messages" style="margin-top:14px; max-height:55vh; overflow:auto;">
+        <p class="hint">Loading conversation…</p>
+    </div>
+</div>
+
+<div class="tab-panel" id="tab-term" style="display:none;">
+    <pre id="terminal" style="margin-top:14px; background:#0d1117; color:#e6edf3; padding:12px;
+         border-radius:10px; height:55vh; overflow:auto; white-space:pre-wrap;
+         font-family:ui-monospace,Menlo,monospace; font-size:12px; line-height:1.45;">connecting…</pre>
+    <div class="action-bar" style="margin-top:8px;">
+        <button class="btn btn-undo" onclick="sendKey(['C-c'])">⎋ Interrupt</button>
+        <button class="btn" onclick="sendKey(['Escape'])">Esc</button>
+        <button class="btn" onclick="sendKey(['Enter'])">↵ Enter</button>
+        <button class="btn" onclick="scrollTermBottom()">⤓ Latest</button>
+    </div>
+</div>
+
 <div style="position:sticky; bottom:0; padding:12px 0; background:var(--bg);">
     <div style="display:flex; gap:8px;">
         <textarea id="input" class="form-input" rows="2"
-                  placeholder="Type a message to the agent, Enter to send (Shift+Enter = newline)…"
+                  placeholder="Message the agent — Enter to send (Shift+Enter = newline)…"
                   style="resize:vertical; font-family:inherit;"></textarea>
         <button class="btn btn-primary" onclick="sendMessage()" id="send-btn">Send</button>
     </div>
@@ -77,106 +81,109 @@ const apiBase = `/api/sessions/${encodeURIComponent(MACHINE)}/${encodeURICompone
 function toast(m){const t=document.createElement('div');t.className='toast';t.textContent=m;
     document.body.appendChild(t);setTimeout(()=>t.remove(),2000);}
 function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
-
-// Only auto-follow when the user is already at the bottom; never yank them down
-// while they're scrolled up reading.
-function nearBottom(el){ return el.scrollHeight - el.scrollTop - el.clientHeight < 40; }
+function nearBottom(el){return el.scrollHeight - el.scrollTop - el.clientHeight < 50;}
 
 // ---- Summary ----
 function renderCard(c){
-    if(!c)return;
-    let h='';
+    if(!c)return;let h='';
     if(c.title)h+=`<div class="wl-title" style="margin-bottom:8px;">${esc(c.title)}</div>`;
     if(c.summary)h+=`<p style="margin-bottom:10px;">${esc(c.summary)}</p>`;
     h+='<dl>';
     if(c.current_state)h+=`<dt>Current</dt><dd>${esc(c.current_state)}</dd>`;
     if(c.next_action)h+=`<dt>Next</dt><dd class="next-action">${esc(c.next_action)}</dd>`;
     h+='</dl>';
-    if(c.open_items&&c.open_items.length){
-        h+='<h2 style="margin-top:12px;">Possibly missed</h2><ul class="avoid-list">';
-        c.open_items.forEach(i=>h+=`<li>${esc(i)}</li>`);h+='</ul>';
-    }
-    document.getElementById('sum-content').innerHTML=h;
+    if(c.open_items&&c.open_items.length){h+='<h2 style="margin-top:12px;">Possibly missed</h2><ul class="avoid-list">';c.open_items.forEach(i=>h+=`<li>${esc(i)}</li>`);h+='</ul>';}
+    const el=document.getElementById('sum-content'); if(el)el.innerHTML=h;
     const e=document.getElementById('sum-empty'); if(e)e.remove();
 }
 if(CARD)renderCard(CARD);
-
 function genSummary(){
-    const b=document.getElementById('sum-btn');
-    b.classList.add('btn-loading');b.textContent='Thinking…';
+    const b=document.getElementById('sum-btn');b.classList.add('btn-loading');b.textContent='Thinking…';
     fetch(apiBase+'/summary?force=true').then(r=>r.json()).then(d=>{
         b.classList.remove('btn-loading');b.textContent='↻ Regenerate';
-        if(d.error){toast(d.detail||d.error);return;}
-        renderCard(d);
+        if(d.error){toast(d.detail||d.error);return;}renderCard(d);
     }).catch(()=>{b.classList.remove('btn-loading');b.textContent='↻ Generate';toast('failed');});
 }
 
-// ---- Terminal (WebSocket live screen) ----
+// ---- Chat (parsed transcript, polled; re-render only on change) ----
+const box = document.getElementById('messages');
+let lastSig = '';
+function renderMessages(msgs, source){
+    const sig = msgs.length + ':' + (msgs.length ? msgs[msgs.length-1].text.slice(0,40) : '');
+    if(sig === lastSig) return;          // nothing changed → don't touch the DOM
+    lastSig = sig;
+    const follow = nearBottom(box);
+    if(!msgs.length){
+        box.innerHTML = '<p class="hint">No messages parsed yet'
+            + (source==='screen' ? ' (showing screen capture — agent may be a TUI).' : '.') + '</p>';
+        return;
+    }
+    box.innerHTML = msgs.map(m=>{
+        const role = m.role==='user' ? 'user' : 'assistant';
+        return `<div class="msg-item msg-${role}"><span class="msg-role">${role}</span>`
+             + `<div class="msg-content">${esc(m.text)}</div></div>`;
+    }).join('');
+    if(follow) box.scrollTop = box.scrollHeight;
+}
+function pollChat(){
+    fetch(apiBase+'/transcript').then(r=>r.json()).then(d=>{
+        if(d.messages && d.messages.length) renderMessages(d.messages, d.source);
+        else if(d.reply) renderMessages([{role:'agent', text:d.reply}], d.source);
+        else renderMessages([], d.source);
+    }).catch(()=>{});
+}
+
+// ---- Terminal (lazy WebSocket; only when the tab is opened) ----
 const term = document.getElementById('terminal');
 let termWs = null;
-function scrollTermBottom(){ term.scrollTop = term.scrollHeight; }
+function scrollTermBottom(){term.scrollTop = term.scrollHeight;}
 function connectTerminal(){
-    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const url = `${proto}//${location.host}/ws/session/${encodeURIComponent(MACHINE)}/${encodeURIComponent(NAME)}`;
-    termWs = new WebSocket(url);
+    if(termWs) return;
+    const proto = location.protocol==='https:' ? 'wss:' : 'ws:';
+    termWs = new WebSocket(`${proto}//${location.host}/ws/session/${encodeURIComponent(MACHINE)}/${encodeURIComponent(NAME)}`);
     termWs.onmessage = e => {
         const msg = JSON.parse(e.data);
-        if (msg.type === 'screen') {
-            const follow = nearBottom(term);
-            if (term.textContent !== msg.content) term.textContent = msg.content;
-            if (follow) scrollTermBottom();   // only if user was at bottom
-        } else if (msg.type === 'error') {
-            term.textContent = '⚠ ' + msg.content;
-        }
+        if(msg.type==='screen'){const f=nearBottom(term); if(term.textContent!==msg.content)term.textContent=msg.content; if(f)scrollTermBottom();}
+        else if(msg.type==='error'){term.textContent='⚠ '+msg.content;}
     };
-    termWs.onclose = () => { termWs = null; setTimeout(connectTerminal, 2000); };
-    termWs.onerror = () => { try { termWs.close(); } catch(e){} };
+    termWs.onclose = () => { termWs = null; };
 }
 function sendKey(keys){
-    if (termWs && termWs.readyState === WebSocket.OPEN) termWs.send(JSON.stringify({type:'key', keys}));
+    if(termWs&&termWs.readyState===WebSocket.OPEN) termWs.send(JSON.stringify({type:'key',keys}));
     else fetch(apiBase+'/key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({keys})});
 }
 
-// ---- Send message ----
-function sendMessage(){
-    const ta=document.getElementById('input');
-    const text=ta.value.trim();
-    if(!text)return;
-    const btn=document.getElementById('send-btn');
-    btn.classList.add('btn-loading');
-    const send = () => fetch(apiBase+'/send',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({text})}).then(r=>r.json());
-    // Prefer the open socket for lower latency.
-    if (termWs && termWs.readyState === WebSocket.OPEN) {
-        termWs.send(JSON.stringify({type:'send', content:text}));
-        btn.classList.remove('btn-loading'); ta.value=''; scrollTermBottom();
-    } else {
-        send().then(d=>{ btn.classList.remove('btn-loading');
-            if(d.error){toast(d.error);return;} ta.value=''; scrollTermBottom();
-        }).catch(()=>{btn.classList.remove('btn-loading');toast('send failed');});
-    }
+function switchTab(tab){
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+    document.getElementById('tab-chat').style.display = tab==='chat' ? '' : 'none';
+    document.getElementById('tab-term').style.display = tab==='term' ? '' : 'none';
+    if(tab==='term') connectTerminal();   // connect only when actually viewing the terminal
 }
-document.getElementById('input').addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
-});
 
-function launchAgent(cmd){
-    fetch(apiBase+'/send',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({text:cmd})}).then(r=>r.json()).then(d=>{
-        if(d.error){toast(d.error);return;}
-        toast('launching '+cmd+'…');
-        const b=document.getElementById('shell-banner'); if(b)b.style.display='none';
-        scrollTermBottom();
-    });
+// ---- Send ----
+function sendMessage(){
+    const ta=document.getElementById('input'); const text=ta.value.trim(); if(!text)return;
+    const btn=document.getElementById('send-btn'); btn.classList.add('btn-loading');
+    if(termWs&&termWs.readyState===WebSocket.OPEN){
+        termWs.send(JSON.stringify({type:'send',content:text})); btn.classList.remove('btn-loading'); ta.value='';
+        setTimeout(pollChat, 1200); return;
+    }
+    fetch(apiBase+'/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text})})
+        .then(r=>r.json()).then(d=>{btn.classList.remove('btn-loading');
+            if(d.error){toast(d.error);return;} ta.value=''; setTimeout(pollChat, 1200);})
+        .catch(()=>{btn.classList.remove('btn-loading');toast('send failed');});
 }
+document.getElementById('input').addEventListener('keydown', e=>{
+    if(e.key==='Enter' && !e.shiftKey){e.preventDefault(); sendMessage();}
+});
 
 function killSession(){
     if(!confirm('Kill tmux session "'+NAME+'"? This ends the agent process.'))return;
-    fetch(apiBase,{method:'DELETE'}).then(r=>r.json()).then(d=>{
-        if(d.ok)location.href='/'; else toast(d.error||'failed');
-    });
+    fetch(apiBase,{method:'DELETE'}).then(r=>r.json()).then(d=>{if(d.ok)location.href='/'; else toast(d.error||'failed');});
 }
 
-connectTerminal();
+// boot: chat polls on a relaxed cadence (cheap local file parse, no TUI re-render)
+pollChat();
+setInterval(pollChat, 3000);
 </script>
 {% endblock %}

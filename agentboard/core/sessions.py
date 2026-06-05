@@ -57,11 +57,11 @@ def _local_process_tree() -> tuple[dict[int, str], dict[int, list[int]]]:
     return args_by_pid, children
 
 
-def _cli_from_tree(pid: int, tree: tuple[dict[int, str], dict[int, list[int]]]) -> str | None:
-    """Find an agent CLI by scanning a pane's process and its descendants."""
-    if pid <= 1:  # never walk from init/kernel — that would match the whole box
-        return None
-    args_by_pid, children = tree
+def _descendants(pid: int, children: dict[int, list[int]]) -> list[int]:
+    """Pane process plus all descendants (skips init/kernel to avoid the box)."""
+    if pid <= 1:
+        return []
+    out: list[int] = []
     seen: set[int] = set()
     stack = [pid]
     while stack:
@@ -69,11 +69,48 @@ def _cli_from_tree(pid: int, tree: tuple[dict[int, str], dict[int, list[int]]]) 
         if p in seen:
             continue
         seen.add(p)
+        out.append(p)
+        stack.extend(children.get(p, []))
+    return out
+
+
+def _cli_from_tree(pid: int, tree: tuple[dict[int, str], dict[int, list[int]]]) -> str | None:
+    """Find an agent CLI by scanning a pane's process and its descendants."""
+    args_by_pid, children = tree
+    for p in _descendants(pid, children):
         low = args_by_pid.get(p, "").lower()
         for needles, cli in _PROC_SIGNATURES:
             if any(n in low for n in needles):
                 return cli
-        stack.extend(children.get(p, []))
+    return None
+
+
+def jsonl_for_pid(pid: int) -> str | None:
+    """The agent transcript a local pane is actively writing, via lsof.
+
+    Precisely maps a live pane to its own JSONL (even when several agents share a
+    directory) by inspecting which ``.jsonl`` under ~/.codex/~/.claude the pane's
+    process tree has open. Best-effort: returns None on any failure.
+    """
+    _, children = _local_process_tree()
+    pids = _descendants(pid, children)
+    if not pids:
+        return None
+    try:
+        proc = subprocess.run(
+            ["lsof", "-p", ",".join(map(str, pids)), "-Fn"],
+            capture_output=True, text=True, timeout=8,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    for line in proc.stdout.splitlines():
+        if not line.startswith("n") or not line.endswith(".jsonl"):
+            continue
+        path = line[1:]
+        if "/.claude/projects/" in path or "/.codex/" in path:
+            if path.rsplit("/", 1)[-1].startswith("agent-"):
+                continue  # subagent sidechain, not the main transcript
+            return path
     return None
 
 # (substring, cli_type, is_agent). First match wins; checked against the pane's
