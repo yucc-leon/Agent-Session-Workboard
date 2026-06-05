@@ -876,28 +876,59 @@ h1 {
     flex-wrap: wrap;
 }
 .project-summary::-webkit-details-marker { display: none; }
-.project-summary::before {
+/* ps-main = chevron + folder + name (truncates); ps-meta = the chips group.
+   The chevron lives on ps-main so it always stays beside the name, even when
+   ps-meta wraps to its own line on mobile. */
+.ps-main {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+.ps-main::before {
     content: "▸";
     font-size: 14px;
     color: var(--accent);
     transition: transform 0.15s;
+    flex: 0 0 auto;
 }
-.project-group[open] > .project-summary {
-    border-radius: 8px 8px 0 0;
-}
-.project-group[open] > .project-summary::before { transform: rotate(90deg); }
+.project-group[open] > .project-summary .ps-main::before { transform: rotate(90deg); }
+.project-group[open] > .project-summary { border-radius: 8px 8px 0 0; }
 .project-summary:hover { filter: brightness(1.15); }
+.ps-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+}
 .project-name {
     font-weight: 700;
     font-size: 16px;
     letter-spacing: 0.2px;
-    flex: 1 1 auto;
     min-width: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
-.project-summary .hint { margin-left: auto; white-space: nowrap; }
+
+/* Compact conversation-count chip on a project header */
+.conv-count {
+    flex: 0 0 auto;
+    font-size: 12px;
+    color: var(--text-secondary);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 2px 9px;
+    white-space: nowrap;
+}
+
+/* AI summaries on/off toggle in the toolbar (distinct from the action button) */
+.btn-aitoggle { white-space: nowrap; }
+.btn-aitoggle.on { border-color: rgba(63,185,80,0.5); color: var(--green); }
+.btn-aitoggle.off { color: var(--text-secondary); }
 .project-new {
     padding: 3px 10px;
     font-size: 12px;
@@ -975,14 +1006,16 @@ html, body { max-width: 100%; overflow-x: hidden; }
     .toolbar .btn { padding: 7px 11px; font-size: 13px; flex: 0 0 auto; white-space: nowrap; }
     .toolbar .hdr-menu { flex: 0 0 auto; }
 
-    /* Project header row */
-    .project-summary { padding: 11px 12px; gap: 6px; }
-    .project-name { font-size: 15px; flex-basis: 100%; }   /* name gets its own line */
-    .project-summary .machine-badge { font-size: 11px; }
-    /* Flow the count after the badge instead of pushing it to the far right
-       (margin-left:auto could shove it past the viewport edge). */
-    .project-summary .hint { font-size: 12px; margin-left: 0; }
-    .project-new { padding: 3px 9px; font-size: 12px; margin-left: auto; }
+    /* Project header: one tidy row — ▸ 📂 Name … [badge] [💬N] [＋].
+       Name grows + truncates so the chevron stays attached to it and the
+       meta chips line up on the right. */
+    .project-summary { padding: 11px 12px; gap: 6px 8px; }
+    .ps-main { flex-basis: 100%; }        /* name row; meta wraps below it */
+    .project-name { font-size: 15px; }
+    .ps-meta .machine-badge { font-size: 11px; }
+    .ps-meta { width: 100%; }
+    .conv-count { font-size: 12px; }
+    .project-new { padding: 4px 10px; font-size: 13px; line-height: 1; }
 
     /* Items: title prominent, badges wrap under it, no right-edge clipping */
     .project-item { padding: 10px 12px 10px 20px; margin-left: 12px; }
