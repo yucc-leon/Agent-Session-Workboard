@@ -267,8 +267,8 @@ class SessionRegistry:
     """
 
     machines: list[MachineConfig]
-    remote_ttl: float = 8.0
-    conv_ttl: float = 25.0
+    remote_ttl: float = 60.0
+    conv_ttl: float = 60.0
     _cache: dict[str, tuple[float, list[Session]]] = field(default_factory=dict)
     _conv_cache: tuple[float, list] | None = field(default=None)
 
@@ -287,24 +287,38 @@ class SessionRegistry:
         return _sessions_from_panes(mc, panes)
 
     def list(self, *, refresh: bool = False) -> list[Session]:
-        """All sessions across all machines (agents first)."""
-        out: list[Session] = []
+        """All sessions across all machines (agents first).
+
+        Machines that need a fresh scan are queried in parallel so the cold path
+        doesn't scale with the number of (SSH) machines.
+        """
         now = time.monotonic()
+        results: dict[str, list[Session]] = {}
+        todo: list[MachineConfig] = []
         for mc in self.machines:
-            is_remote = mc.type == "ssh"
             cached = self._cache.get(mc.name)
             if (
                 not refresh
-                and is_remote
+                and mc.type == "ssh"
                 and cached
                 and now - cached[0] < self.remote_ttl
             ):
-                out.extend(cached[1])
-                continue
-            sessions = self._discover_machine(mc)
-            if is_remote:
-                self._cache[mc.name] = (now, sessions)
-            out.extend(sessions)
+                results[mc.name] = cached[1]
+            else:
+                todo.append(mc)
+
+        if todo:
+            from concurrent.futures import ThreadPoolExecutor
+
+            with ThreadPoolExecutor(max_workers=len(todo)) as ex:
+                for mc, sessions in zip(todo, ex.map(self._discover_machine, todo)):
+                    results[mc.name] = sessions
+                    if mc.type == "ssh":
+                        self._cache[mc.name] = (now, sessions)
+
+        out: list[Session] = []
+        for mc in self.machines:
+            out.extend(results.get(mc.name, []))
         return out
 
     def get(self, machine: str, name: str, *, refresh: bool = False) -> Session | None:
@@ -353,27 +367,30 @@ class SessionRegistry:
             if s.is_agent:
                 live_panes[(s.machine, _norm(s.cwd), s.cli)].append(s.name)
 
-        # Gather conversations from every machine: local logs directly, remote
-        # logs over SSH (best-effort — a dead remote yields nothing, not an error).
-        collected: list[Conversation] = []
-        for mc in self.machines:
+        # Gather conversations from every machine in PARALLEL: each remote scan is
+        # an SSH round-trip, so running them sequentially made the cold load scale
+        # with the number of machines. Best-effort — a dead remote yields nothing.
+        def _discover(mc: MachineConfig) -> list[Conversation]:
             codex_home = mc.codex_home or "~/.codex"
             claude_home = mc.claude_home or "~/.claude"
             if mc.type == "local":
-                found = discover_conversations(codex_home, claude_home)
-                found = [
+                return [
                     Conversation(cli=c.cli, cwd=c.cwd, session_id=c.session_id,
                                  path=c.path, title=c.title,
                                  last_activity_ms=c.last_activity_ms, machine=mc.name)
-                    for c in found
+                    for c in discover_conversations(codex_home, claude_home)
                 ]
-            elif mc.host:
-                found = discover_remote_conversations(
-                    mc.host, mc.name, codex_home, claude_home
-                )
-            else:
-                found = []
-            collected.extend(found)
+            if mc.host:
+                return discover_remote_conversations(mc.host, mc.name, codex_home, claude_home)
+            return []
+
+        collected: list[Conversation] = []
+        if self.machines:
+            from concurrent.futures import ThreadPoolExecutor
+
+            with ThreadPoolExecutor(max_workers=len(self.machines)) as ex:
+                for found in ex.map(_discover, self.machines):
+                    collected.extend(found)
 
         groups: dict[tuple[str, str, str], list[Conversation]] = defaultdict(list)
         for c in collected:
