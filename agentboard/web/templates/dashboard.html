@@ -6,13 +6,9 @@
     <div class="toolbar">
         <button class="btn" onclick="refreshSessions()" id="refresh-btn">↻ Refresh</button>
         {% if summary_available %}
-        {% if summary_enabled %}
-        <button class="btn" onclick="titleSessions()" id="sumrec-btn"
-                title="Give recent conversations a short LLM title (cheap)">✨ Title sessions</button>
-        {% endif %}
         <button class="btn btn-aitoggle {{ 'on' if summary_enabled else 'off' }}"
                 onclick="setSummary({{ (not summary_enabled)|tojson }})"
-                title="{{ 'AI summaries are ON — tap to turn off' if summary_enabled else 'AI summaries are OFF — tap to turn on' }}">
+                title="{{ 'AI titles & summaries are ON (auto) — tap to turn off' if summary_enabled else 'AI titles & summaries are OFF — tap to turn on' }}">
             {{ '🟢 AI on' if summary_enabled else '⚪ AI off' }}
         </button>
         {% endif %}
@@ -71,7 +67,7 @@
 
     {% for row in g.convs %}
     {% set c = row.c %}
-    <a class="workline-card project-item"
+    <a class="workline-card project-item" data-key="{{ c.key }}"
        href="{{ ('/s/' ~ c.machine ~ '/' ~ c.live_tmux) if c.live_tmux else ('/c/' ~ c.machine ~ '/' ~ c.cli ~ '/' ~ c.session_id) }}"
        data-search="{{ (row.title ~ ' ' ~ c.project ~ ' ' ~ c.cli)|lower }}">
         <div class="wl-header">
@@ -199,14 +195,22 @@ function setSummary(enabled) {
         .catch(() => toast('failed'));
 }
 
-function titleSessions() {
-    const b = document.getElementById('sumrec-btn');
-    b.classList.add('btn-loading'); b.textContent = '✨ Titling…';
+const SUMMARY_ENABLED = {{ summary_enabled | tojson }};
+
+// Auto-title in the background (no button to fumble). Untitled conversations get
+// a short LLM title; results patch into the list in place. Cheap on repeat —
+// already-titled ones are skipped server-side, so this no-ops once warmed.
+function autoTitle() {
+    if (!SUMMARY_ENABLED) return;
     fetch('/api/summarize-recent', {method: 'POST'}).then(r => r.json()).then(d => {
-        if (d.error) { toast(d.error); b.classList.remove('btn-loading'); b.textContent = '✨ Title sessions'; return; }
-        toast(`titled ${d.titled} of ${d.scanned}`);
-        location.reload();
-    }).catch(() => { b.classList.remove('btn-loading'); b.textContent = '✨ Title sessions'; toast('failed'); });
+        const titles = d.titles || {};
+        let n = 0;
+        for (const [key, title] of Object.entries(titles)) {
+            document.querySelectorAll(`.workline-card[data-key="${CSS.escape(key)}"] .wl-title`)
+                .forEach(el => { el.textContent = title; n++; });
+        }
+        if (n) toast(`titled ${n}`);
+    }).catch(() => {});
 }
 
 const modal = document.getElementById('new-modal');
@@ -270,5 +274,8 @@ function createSession() {
         else { toast(d.error || 'failed'); btn.classList.remove('btn-loading'); btn.textContent = 'Create'; }
     }).catch(() => { toast('request failed'); btn.classList.remove('btn-loading'); btn.textContent = 'Create'; });
 }
+
+// Kick background titling once the page is up.
+autoTitle();
 </script>
 {% endblock %}

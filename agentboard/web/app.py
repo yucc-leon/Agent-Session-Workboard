@@ -308,17 +308,19 @@ def create_app(config: Config) -> FastAPI:
         # models), so run a few concurrently rather than one-at-a-time.
         sem = asyncio.Semaphore(5)
 
-        async def _title_one(c) -> bool:
+        async def _title_one(c) -> tuple[str, str] | None:
             async with sem:
                 try:
                     state = await asyncio.to_thread(registry.conversation_transcript, c)
-                    return bool(await quick_title(config, c.key, state))
+                    title = await quick_title(config, c.key, state)
+                    return (c.key, title) if title else None
                 except Exception:
                     logger.debug("quick_title failed for %s", c.key, exc_info=True)
-                    return False
+                    return None
 
         results = await asyncio.gather(*[_title_one(c) for c in todo])
-        return {"ok": True, "titled": sum(results), "scanned": len(convs)}
+        titles = {k: v for r in results if r for k, v in [r]}
+        return {"ok": True, "titled": len(titles), "scanned": len(convs), "titles": titles}
 
     @app.get("/api/conversations/{machine}/{cli}/{session_id}/transcript")
     async def api_conv_transcript(machine: str, cli: str, session_id: str):
