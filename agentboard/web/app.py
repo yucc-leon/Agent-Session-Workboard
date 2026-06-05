@@ -28,7 +28,18 @@ import asyncio
 import os
 import shlex
 import subprocess
+import time
 from pathlib import Path
+
+# A conversation still being written this recently, but not in a tmux session we
+# control, is likely running elsewhere (a VS Code terminal, a bare SSH shell).
+_ACTIVE_WINDOW_MS = 300_000
+
+
+def _active_elsewhere(last_activity_ms: int, live: bool) -> bool:
+    if live or not last_activity_ms:
+        return False
+    return (time.time() * 1000 - last_activity_ms) < _ACTIVE_WINDOW_MS
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
@@ -206,6 +217,7 @@ def create_app(config: Config) -> FastAPI:
                 "c": c,
                 "title": title,
                 "open_items": len(card.open_items) if card else 0,
+                "active": _active_elsewhere(c.last_activity_ms, bool(c.live_tmux)),
             })
             g["recent"] = max(g["recent"], c.last_activity_ms)
 
@@ -266,6 +278,7 @@ def create_app(config: Config) -> FastAPI:
             conv=d,
             card=card.as_dict() if card else None,
             summary_enabled=_summary_enabled(),
+            active_elsewhere=_active_elsewhere(conv.last_activity_ms, bool(d["live_tmux"])),
         )
 
     @app.get("/api/conversations")

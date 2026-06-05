@@ -12,12 +12,23 @@
     <div style="display:flex; gap:8px;">
         {% if conv.live_tmux %}
         <a class="btn btn-accent" href="/s/{{ conv.machine }}/{{ conv.live_tmux }}">🟢 Open live session</a>
+        {% elif active_elsewhere %}
+        <button class="btn btn-undo" id="resume-btn" onclick="resume()">▶ Resume anyway (new copy)</button>
         {% else %}
         <button class="btn btn-primary" id="resume-btn" onclick="resume()">▶ Resume</button>
         {% endif %}
     </div>
 </div>
 <div class="hint">📁 {{ conv.cwd }} · <code>{{ conv.session_id }}</code></div>
+
+{% if active_elsewhere %}
+<div class="warn-banner">
+    ⚡ This conversation looks active outside AgentBoard — likely a VS Code terminal
+    or a bare SSH shell. AgentBoard can only drive agents that run inside <b>tmux</b>,
+    so “Resume” would start a <b>separate copy</b> that may conflict. To control it
+    from any device, run the agent inside tmux (e.g. <code>tmux new -s work; {{ conv.cli }}</code>).
+</div>
+{% endif %}
 
 <!-- Summary panel -->
 <div class="detail-section">

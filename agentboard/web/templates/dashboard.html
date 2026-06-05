@@ -73,7 +73,8 @@
         <div class="wl-header">
             <div class="wl-title">{{ row.title }}</div>
             <div class="wl-badges">
-                {% if c.live_tmux %}<span class="badge status-active">● live</span>{% endif %}
+                {% if c.live_tmux %}<span class="badge status-active">● live</span>
+                {% elif row.active %}<span class="badge status-review" title="active outside tmux (e.g. VS Code) — opening resumes a separate copy">⚡ active</span>{% endif %}
                 <span class="badge source-{{ c.cli }}">{{ c.cli }}</span>
                 {% if row.open_items %}<span class="badge status-review" title="possibly-missed items">⚑ {{ row.open_items }}</span>{% endif %}
             </div>
