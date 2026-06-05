@@ -3,7 +3,7 @@
 
 <div class="detail-header">
     <h1>Agent Sessions</h1>
-    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+    <div class="toolbar">
         <button class="btn" onclick="refreshSessions()" id="refresh-btn">↻ Refresh</button>
         {% if summary_available %}
         {% if summary_enabled %}
@@ -46,9 +46,8 @@
         {% if g.live|length %}<span class="badge status-active">● {{ g.live|length }} live</span>{% endif %}
         <span class="hint">{{ g.convs|length }} conversation{{ '' if g.convs|length == 1 else 's' }}</span>
         <button class="btn project-new"
-            onclick="event.preventDefault(); event.stopPropagation(); openNewSession({{ g.machine|tojson }}, {{ g.cwd|tojson }})">
-            ＋ New session
-        </button>
+            onclick="event.preventDefault(); event.stopPropagation(); openNewSession({{ g.machine|tojson }}, {{ g.cwd|tojson }})"
+            title="New session in this project">＋ New</button>
     </summary>
 
     {% for row in g.live %}

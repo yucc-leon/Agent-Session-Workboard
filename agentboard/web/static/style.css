@@ -245,6 +245,9 @@ body {
 .wl-title {
     font-weight: 600;
     font-size: 15px;
+    overflow-wrap: anywhere;   /* long URLs/IDs/paths must wrap, not widen */
+    word-break: break-word;
+    min-width: 0;
 }
 
 .wl-badges {
@@ -252,6 +255,8 @@ body {
     gap: 6px;
     flex-shrink: 0;
 }
+
+.wl-meta span { overflow-wrap: anywhere; word-break: break-word; }
 
 .wl-next-action {
     margin-top: 8px;
@@ -306,6 +311,11 @@ body {
 .detail-header h1 {
     font-size: 22px;
 }
+
+/* Toolbar of header actions. Base wraps; mobile (below) makes it a single
+   horizontally-scrollable row. Defined before the media query so the mobile
+   override wins by source order. */
+.toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 
 .detail-grid {
     display: grid;
@@ -851,7 +861,7 @@ h1 {
 .project-summary {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     padding: 12px 16px;
     cursor: pointer;
     user-select: none;
@@ -863,6 +873,7 @@ h1 {
     position: sticky;
     top: 0;
     z-index: 2;
+    flex-wrap: wrap;
 }
 .project-summary::-webkit-details-marker { display: none; }
 .project-summary::before {
@@ -880,8 +891,13 @@ h1 {
     font-weight: 700;
     font-size: 16px;
     letter-spacing: 0.2px;
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
-.project-summary .hint { margin-left: auto; }
+.project-summary .hint { margin-left: auto; white-space: nowrap; }
 .project-new {
     padding: 3px 10px;
     font-size: 12px;
@@ -929,3 +945,54 @@ h1 {
 .msg-item .msg-content { margin-top: 4px; font-size: 13px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
 .msg-item.msg-user { border-left: 3px solid var(--accent); }
 .msg-item.msg-assistant { border-left: 3px solid var(--green); }
+
+/* ===================================================================== */
+/* Mobile (phone) — keep everything visible, shrink the chrome, focus on */
+/* project names + conversation titles.                                  */
+/* ===================================================================== */
+html, body { max-width: 100%; overflow-x: hidden; }
+* { min-width: 0; }   /* let flex children shrink instead of overflowing */
+
+@media (max-width: 640px) {
+    .container { padding: 12px; overflow-x: hidden; }
+    .workline-list, .project-group, .workline-card { max-width: 100%; }
+    .navbar { padding: 10px 14px; }
+
+    /* Header: title on its own line, toolbar wraps below as compact chips. */
+    .detail-header { flex-direction: column; align-items: stretch; gap: 10px; margin-bottom: 16px; }
+    .detail-header h1 { font-size: 19px; }
+    /* Toolbar is one horizontally-scrollable row: it never widens the page
+       (the scroll container caps its own width), and labels stay intact. */
+    .toolbar {
+        width: 100%;
+        max-width: 100%;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        gap: 6px;
+        padding-bottom: 2px;
+    }
+    .toolbar .btn { padding: 7px 11px; font-size: 13px; flex: 0 0 auto; white-space: nowrap; }
+    .toolbar .hdr-menu { flex: 0 0 auto; }
+
+    /* Project header row */
+    .project-summary { padding: 11px 12px; gap: 6px; }
+    .project-name { font-size: 15px; flex-basis: 100%; }   /* name gets its own line */
+    .project-summary .machine-badge { font-size: 11px; }
+    /* Flow the count after the badge instead of pushing it to the far right
+       (margin-left:auto could shove it past the viewport edge). */
+    .project-summary .hint { font-size: 12px; margin-left: 0; }
+    .project-new { padding: 3px 9px; font-size: 12px; margin-left: auto; }
+
+    /* Items: title prominent, badges wrap under it, no right-edge clipping */
+    .project-item { padding: 10px 12px 10px 20px; margin-left: 12px; }
+    .wl-header { flex-direction: column; align-items: flex-start; gap: 4px; }
+    .wl-badges { flex-wrap: wrap; }
+    .wl-title { font-size: 14px; line-height: 1.35; }
+    .wl-meta { flex-wrap: wrap; gap: 6px 10px; }
+    .card-kill { position: absolute; top: 8px; right: 8px; opacity: 0.5; }
+    .project-item { position: relative; }
+
+    /* Dropdown menu spans the width so it doesn't spill off-screen */
+    .menu-pop { right: auto; left: 0; }
+}
