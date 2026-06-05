@@ -31,16 +31,6 @@ import subprocess
 import time
 from pathlib import Path
 
-# A conversation still being written this recently, but not in a tmux session we
-# control, is likely running elsewhere (a VS Code terminal, a bare SSH shell).
-_ACTIVE_WINDOW_MS = 300_000
-
-
-def _active_elsewhere(last_activity_ms: int, live: bool) -> bool:
-    if live or not last_activity_ms:
-        return False
-    return (time.time() * 1000 - last_activity_ms) < _ACTIVE_WINDOW_MS
-
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
@@ -58,6 +48,16 @@ STATIC_DIR = Path(__file__).parent / "static"
 _jinja = Environment(loader=FileSystemLoader(str(TEMPLATES_DIR)), autoescape=True)
 
 _SSH_OPTS = ["-o", "ConnectTimeout=8", "-o", "BatchMode=yes"]
+
+# A conversation still being written this recently, but not in a tmux session we
+# control, is likely running elsewhere (a VS Code terminal, a bare SSH shell).
+_ACTIVE_WINDOW_MS = 300_000
+
+
+def _active_elsewhere(last_activity_ms: int, live: bool) -> bool:
+    if live or not last_activity_ms:
+        return False
+    return (time.time() * 1000 - last_activity_ms) < _ACTIVE_WINDOW_MS
 
 
 def _render(template: str, **ctx) -> HTMLResponse:
