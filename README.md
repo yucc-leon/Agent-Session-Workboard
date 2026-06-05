@@ -19,8 +19,8 @@ uv run agentboard init        # writes ~/.agentboard/config.yaml
 uv run agentboard web         # local hub at http://127.0.0.1:8765
 ```
 
-Already have agents running in tmux? They appear automatically. Otherwise click
-**🚀 New Session** to launch one.
+Already have agents running in tmux? They appear automatically. Otherwise use
+**＋ New** (inside any project group, or **＋ New project…**) to launch one.
 
 ### Reach it from anywhere
 
@@ -51,8 +51,9 @@ The dashboard has two tiers:
 - **🟢 Live now** — agents currently running in tmux (local or SSH). Drive them
   directly: read, send messages, interrupt.
 - **💬 Conversations** — your full Codex/Claude history from their JSONL logs,
-  across every project, with recognizable titles. Read or summarize any of them;
-  **Resume** a closed one to bring it back as a live tmux session. A conversation
+  across every project, with LLM-generated titles (auto, cached). **Just type to
+  continue** — sending a message revives a closed conversation into a live tmux
+  session and delivers your message; no separate "Resume" step. A conversation
   that's already live links straight to its operate page.
 
 Other things:
@@ -61,7 +62,8 @@ Other things:
   one-line summary and a badge for unresolved items.
 - **Chat** — read the parsed transcript (rich for local Codex/Claude via their
   JSONL logs; screen-capture fallback for remote) and send messages.
-- **Terminal** — a live `capture-pane` stream with Interrupt / Esc / Enter keys.
+- **Terminal** — a real interactive terminal (xterm.js over a pty / tmux attach),
+  with mobile key-row helpers (arrows / Tab / Enter / Esc / Ctrl-C).
 - **Summarize** — an optional LLM pass over one conversation that produces a
   recognizable title, a history recap, the next action, and **possibly-missed
   items** (TODOs/questions left dangling). Cached and only regenerated when the
@@ -106,9 +108,9 @@ machines:
     claude_home: ~/.claude
     tmux: true
 
-llm:                    # optional — only used for summaries
+llm:                    # optional — only used for titles & summaries
   base_url: https://api.deepseek.com
-  model: deepseek-chat
+  model: deepseek-v4-flash
   api_key_env: DEEPSEEK_API_KEY
 
 remote:
