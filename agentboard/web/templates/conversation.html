@@ -122,11 +122,7 @@ function renderConv(){
     let html='';
     if(start>0){html+=`<div style="text-align:center;margin-bottom:8px;">`
         +`<button class="btn" onclick="convShown=convMsgs.length;renderConv()">↑ Load ${start} earlier message${start>1?'s':''}</button></div>`;}
-    html+=convMsgs.slice(start).map(m=>{
-        const role=m.role==='user'?'user':'assistant';
-        return `<div class="msg-item msg-${role}"><span class="msg-role">${role}</span>
-            <div class="msg-content md-wrap">${AB.renderParts(m)}</div></div>`;
-    }).join('');
+    html+=AB.renderTranscript(convMsgs.slice(start));
     box.innerHTML=html;
 }
 function loadTranscript(){

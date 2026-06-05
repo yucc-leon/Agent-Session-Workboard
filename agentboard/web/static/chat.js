@@ -61,8 +61,28 @@
     }).join('');
   }
 
+  // Render a whole transcript as a clean flow: consecutive same-role turns are
+  // merged into one group with a single muted role label; the human's turns get
+  // a subtle tinted block, the agent's read as plain prose.
+  function renderTranscript(msgs) {
+    if (!msgs || !msgs.length) return '';
+    const groups = [];
+    for (const m of msgs) {
+      const last = groups[groups.length - 1];
+      if (last && last.role === m.role) last.msgs.push(m);
+      else groups.push({ role: m.role, msgs: [m] });
+    }
+    return groups.map(g => {
+      const who = g.role === 'user' ? 'You' : 'Agent';
+      const body = g.msgs.map(renderParts).join('');
+      return `<div class="turn turn-${g.role === 'user' ? 'user' : 'agent'}">`
+           + `<div class="turn-role">${who}</div><div class="turn-body">${body}</div></div>`;
+    }).join('');
+  }
+
   global.AB = global.AB || {};
   global.AB.esc = esc;
   global.AB.markdown = markdown;
   global.AB.renderParts = renderParts;
+  global.AB.renderTranscript = renderTranscript;
 })(window);

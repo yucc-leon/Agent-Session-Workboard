@@ -1066,3 +1066,17 @@ html, body { max-width: 100%; overflow-x: hidden; }
     border-radius: 8px; padding: 10px 12px; overflow-x: auto; margin: 8px 0;
 }
 .md-pre code { font-family: ui-monospace, Menlo, monospace; font-size: 12px; white-space: pre; background: none; border: none; padding: 0; }
+
+/* ---- Clean transcript flow (grouped turns) ---- */
+.turn { margin-bottom: 16px; }
+.turn-role {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.03em;
+    color: var(--text-secondary); margin-bottom: 4px;
+}
+.turn-user .turn-role { color: var(--accent); }
+.turn-user .turn-body {
+    background: var(--accent-soft); border-radius: 10px; padding: 10px 14px;
+}
+.turn-agent .turn-body { padding: 0 2px; }
+.turn-body .tool-chip { margin: 4px 0; }
+.turn-body .md + .tool-chip, .turn-body .tool-chip + .md { margin-top: 6px; }

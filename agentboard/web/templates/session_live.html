@@ -129,11 +129,7 @@ function renderMessages(msgs, source){
         html += `<div style="text-align:center; margin-bottom:8px;">`
               + `<button class="btn" onclick="loadEarlier()">↑ Load ${start} earlier message${start>1?'s':''}</button></div>`;
     }
-    html += msgs.slice(start).map(m=>{
-        const role = m.role==='user' ? 'user' : 'assistant';
-        return `<div class="msg-item msg-${role}"><span class="msg-role">${role}</span>`
-             + `<div class="msg-content md-wrap">${AB.renderParts(m)}</div></div>`;
-    }).join('');
+    html += AB.renderTranscript(msgs.slice(start));
     box.innerHTML = html;
     if(follow) box.scrollTop = box.scrollHeight;
 }
