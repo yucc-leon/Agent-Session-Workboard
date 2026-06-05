@@ -105,11 +105,13 @@ function resume(){
 
 loadTranscript();
 
-// Lazy auto-summary: first time you open a conversation (and the feature is on),
-// generate its card in the background so the dashboard title upgrades too.
-if (SUMMARY_ENABLED && !CARD) {
+// On open, ask the server for the summary (when the feature is on). The server
+// reuses the cached card if the conversation hasn't grown (no LLM call) and only
+// regenerates when there are new messages — so this neither wastes tokens nor
+// leaves a stale recap. Spinner only when we have nothing cached yet.
+if (SUMMARY_ENABLED) {
     const b = document.getElementById('sum-btn');
-    if (b) { b.classList.add('btn-loading'); b.textContent = 'Summarizing…'; }
+    if (b && !CARD) { b.classList.add('btn-loading'); b.textContent = 'Summarizing…'; }
     fetch(base + '/summary').then(r => r.json()).then(d => {
         if (b) { b.classList.remove('btn-loading'); b.textContent = '↻ Regenerate'; }
         if (!d.error) renderCard(d);

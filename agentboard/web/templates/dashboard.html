@@ -9,9 +9,15 @@
         {% if summary_enabled %}
         <button class="btn" onclick="summarizeRecent()" id="sumrec-btn"
                 title="LLM-summarize recent conversations (better titles + missed items)">✨ Summarize recent</button>
+        <details class="hdr-menu">
+            <summary class="btn" title="AI summary settings">⚙</summary>
+            <div class="menu-pop">
+                <button class="menu-item" onclick="setSummary(false)">Turn off AI summaries</button>
+            </div>
+        </details>
+        {% else %}
+        <button class="btn" onclick="setSummary(true)" title="Enable LLM summaries">✨ Enable AI summaries</button>
         {% endif %}
-        <button class="btn" onclick="toggleSummary()" id="sumtoggle-btn"
-                title="Turn AI summaries on/off">{{ '✨ AI: On' if summary_enabled else '✨ AI: Off' }}</button>
         {% endif %}
         <button class="btn btn-undo" onclick="cleanupShells()" id="cleanup-btn">🧹 Clean up</button>
         <button class="btn" onclick="openNewSession()">＋ New project…</button>
@@ -188,14 +194,11 @@ function cleanupShells() {
         .then(() => { btn.classList.remove('btn-loading'); toast('cleaned up'); });
 }
 
-function toggleSummary() {
-    const b = document.getElementById('sumtoggle-btn');
-    const turningOn = b.textContent.includes('Off');
-    b.classList.add('btn-loading');
+function setSummary(enabled) {
     fetch('/api/summary/state', {method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({enabled: turningOn})})
+        body: JSON.stringify({enabled})})
         .then(r => r.json()).then(() => location.reload())
-        .catch(() => { b.classList.remove('btn-loading'); toast('failed'); });
+        .catch(() => toast('failed'));
 }
 
 function summarizeRecent() {
