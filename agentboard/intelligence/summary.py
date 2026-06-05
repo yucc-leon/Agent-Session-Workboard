@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -36,8 +37,9 @@ juggling many parallel sessions. Output ONLY a JSON object with these fields:
 
   "title":         a SHORT (<= 8 words) human-recognizable label for THIS \
 conversation, so the user can pick it out of a list at a glance.
-  "summary":       2-4 sentences: what this conversation was about and how far \
-it got. Distinguish the original goal from the current state.
+  "summary":       AT MOST 2-3 sentences, tight: one for the original goal, one \
+for how far it got / where it stands (optionally one for a pivotal turn). Detail \
+belongs in the other fields — do NOT recap everything here.
   "current_state": one sentence on where things stand right now.
   "next_action":   the single most useful next step. Empty string if truly done.
   "open_items":    a list of unresolved or possibly-OVERLOOKED threads — TODOs \
@@ -53,6 +55,18 @@ thin to tell, say so in summary and use empty arrays. The reader will use this \
 to RESUME the work, so optimize for fast context recovery."""
 
 _MAX_TRANSCRIPT_CHARS = 14000
+
+# Split after a CJK terminator, or an ASCII terminator that's followed by
+# whitespace/end — the latter guard keeps decimals like "1.7B" or "v5.2" intact.
+_SENTENCE_SPLIT = re.compile(r"(?<=[。！？])|(?<=[.!?])(?=\s|$)")
+
+
+def _cap_sentences(text: str, n: int = 3) -> str:
+    """Keep at most ``n`` sentences. The model doesn't always honor the prompt's
+    length cap on dense conversations; the recap stays scannable while detail
+    still lives in current_state/next_action/open_items."""
+    parts = [p for p in _SENTENCE_SPLIT.split(text) if p and p.strip()]
+    return ("".join(parts[:n]) if len(parts) > n else text).strip()
 
 
 class SessionCard(BaseModel):
@@ -335,7 +349,7 @@ async def summarize_session(
     try:
         card = SessionCard(
             title=str(data.get("title", "")).strip()[:120],
-            summary=str(data.get("summary", "")).strip(),
+            summary=_cap_sentences(str(data.get("summary", "")).strip()),
             current_state=str(data.get("current_state", "")).strip(),
             next_action=str(data.get("next_action", "")).strip(),
             open_items=[str(x).strip() for x in (data.get("open_items") or []) if str(x).strip()],

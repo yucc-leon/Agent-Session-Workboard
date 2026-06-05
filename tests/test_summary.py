@@ -55,6 +55,17 @@ def test_missing_card_returns_none(tmp_path):
     assert cached_card(_cfg(tmp_path), "local/nope") is None
 
 
+def test_cap_sentences():
+    from agentboard.intelligence.summary import _cap_sentences
+    # CJK: keep first 3 of 5
+    assert _cap_sentences("一。二。三。四。五。") == "一。二。三。"
+    # ASCII: keep 3, and never split a decimal like 1.7B
+    assert _cap_sentences("Trained 1.7B model. Fixed bug. Ran eval. Extra one.") \
+        == "Trained 1.7B model. Fixed bug. Ran eval."
+    # under the cap → unchanged
+    assert _cap_sentences("Only one sentence.") == "Only one sentence."
+
+
 def test_format_transcript_short_keeps_all():
     from agentboard.intelligence.summary import _format_transcript
     out = _format_transcript(_state(4))
