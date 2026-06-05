@@ -125,7 +125,7 @@ function renderConv(){
     html+=convMsgs.slice(start).map(m=>{
         const role=m.role==='user'?'user':'assistant';
         return `<div class="msg-item msg-${role}"><span class="msg-role">${role}</span>
-            <div class="msg-content">${esc(m.text)}</div></div>`;
+            <div class="msg-content md-wrap">${AB.renderParts(m)}</div></div>`;
     }).join('');
     box.innerHTML=html;
 }

@@ -33,12 +33,20 @@ logger = get_logger(__name__)
 
 @dataclass(frozen=True)
 class TranscriptMessage:
-    """A single turn in a conversation — user message or agent reply."""
+    """A single turn in a conversation — user message or agent reply.
+
+    ``text`` is the flattened prose (used for summaries/search). ``parts`` keeps
+    the turn's structure so the UI can render prose, tool calls, etc. distinctly
+    instead of flattening everything together. Each part is a dict:
+      {"type": "text", "text": "..."}            markdown prose
+      {"type": "tool", "name": "Bash", "brief": "..."}   a tool call
+    """
 
     role: str  # "user" | "agent"
     text: str
     timestamp_ms: int = 0
     source_id: str = ""
+    parts: tuple = ()
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -46,6 +54,7 @@ class TranscriptMessage:
             "text": self.text,
             "time": self.timestamp_ms,
             "id": self.source_id,
+            "parts": list(self.parts) if self.parts else [{"type": "text", "text": self.text}],
         }
 
 
@@ -319,12 +328,17 @@ def _codex_messages(events: list[dict[str, Any]]) -> list[TranscriptMessage]:
                             text=text,
                             timestamp_ms=ts,
                             source_id=str(evt.get("id", "")),
+                            parts=({"type": "text", "text": text},),
                         )
                     )
             elif item_type == "tool_call":
                 name = payload.get("name", "tool")
                 messages.append(
-                    TranscriptMessage(role="agent", text=f"🛠 {name}", timestamp_ms=ts)
+                    TranscriptMessage(
+                        role="agent", text=f"🛠 {name}", timestamp_ms=ts,
+                        parts=({"type": "tool", "name": name,
+                                "brief": _tool_brief(payload.get("arguments"))},),
+                    )
                 )
         elif kind == "event_msg" and isinstance(payload, dict):
             ptype = payload.get("type", "")
@@ -425,10 +439,14 @@ def _claude_messages(events: list[dict[str, Any]]) -> list[TranscriptMessage]:
             # text; if there's none (pure tool output), it's the agent's tool
             # round-trip, not something the user said — skip it.
             text = _claude_user_text(content)
+            parts = [{"type": "text", "text": text}] if text.strip() else []
         else:
-            text = _join_claude_content(content) if isinstance(content, list) else str(content)
+            parts = _claude_agent_parts(content)
+            text = "\n".join(p["text"] for p in parts if p["type"] == "text")
 
-        if not text or not text.strip() or _is_claude_boilerplate(text):
+        if not parts or (not text.strip() and all(p["type"] == "text" for p in parts)):
+            continue
+        if text and _is_claude_boilerplate(text):
             continue
         messages.append(
             TranscriptMessage(
@@ -436,9 +454,57 @@ def _claude_messages(events: list[dict[str, Any]]) -> list[TranscriptMessage]:
                 text=text,
                 timestamp_ms=_ts_ms(evt),
                 source_id=str(evt.get("uuid", "")),
+                parts=tuple(parts),
             )
         )
     return messages
+
+
+_TOOL_BRIEF_KEYS = ("command", "file_path", "path", "pattern", "query", "url", "description")
+
+
+def _tool_brief(inp: Any) -> str:
+    """A short one-line hint for a tool call."""
+    if not isinstance(inp, dict) or not inp:
+        return ""
+    for k in _TOOL_BRIEF_KEYS:
+        v = inp.get(k)
+        if isinstance(v, str) and v.strip():
+            return v.strip().replace("\n", " ")[:100]
+    for v in inp.values():
+        if isinstance(v, str) and v.strip():
+            return v.strip().replace("\n", " ")[:100]
+    return ""
+
+
+def _claude_agent_parts(content: Any) -> list[dict]:
+    """Split an assistant turn into typed parts (prose vs tool calls).
+
+    Skips ``thinking`` blocks (internal reasoning) so the chat stays readable.
+    """
+    if isinstance(content, str):
+        return [{"type": "text", "text": content}] if content.strip() else []
+    if not isinstance(content, list):
+        return []
+    parts: list[dict] = []
+    for b in content:
+        if not isinstance(b, dict):
+            if isinstance(b, str) and b.strip():
+                parts.append({"type": "text", "text": b})
+            continue
+        bt = b.get("type")
+        if bt == "text":
+            t = str(b.get("text", ""))
+            if t.strip():
+                parts.append({"type": "text", "text": t})
+        elif bt == "tool_use":
+            parts.append({
+                "type": "tool",
+                "name": str(b.get("name", "tool")),
+                "brief": _tool_brief(b.get("input")),
+            })
+        # thinking / tool_result / others → skipped
+    return parts
 
 
 def _claude_user_text(content: Any) -> str:
