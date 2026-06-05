@@ -189,7 +189,12 @@ def discover_conversations(
 
     claude = Path(os.path.expanduser(claude_home)) / "projects"
     if claude.exists():
-        paths += [(p, "claude") for p in claude.rglob("*.jsonl")]
+        # Skip Claude subagent sidechain logs ("agent-*.jsonl"): they are sub-tasks
+        # of a real session (and carry the parent's id), not standalone chats.
+        paths += [
+            (p, "claude") for p in claude.rglob("*.jsonl")
+            if not p.name.startswith("agent-")
+        ]
 
     # Newest first, recent only, capped.
     def mtime(item: tuple[Path, str]) -> float:
@@ -207,7 +212,22 @@ def discover_conversations(
         conv = _codex_meta(path) if cli == "codex" else _claude_meta(path)
         if conv:
             out.append(conv)
-    return out
+    return _dedupe(out)
+
+
+def _dedupe(convs: list[Conversation]) -> list[Conversation]:
+    """One entry per (cli, session_id) — keep the most-recently-active file.
+
+    Resumes/compactions can write several files under one session id; without
+    this they'd each show as a separate (often same-titled) conversation.
+    """
+    best: dict[tuple[str, str], Conversation] = {}
+    for c in convs:
+        key = (c.cli, c.session_id)
+        cur = best.get(key)
+        if cur is None or c.last_activity_ms > cur.last_activity_ms:
+            best[key] = c
+    return sorted(best.values(), key=lambda c: c.last_activity_ms, reverse=True)
 
 
 # ---------------------------------------------------------------------------
@@ -253,13 +273,15 @@ def boiler(t):
 files=[]
 for sub in ("sessions","rollouts"):
     files += [(p,"codex") for p in glob.glob(os.path.join(os.path.expanduser(codex_home),sub,"**","*.jsonl"),recursive=True)]
-files += [(p,"claude") for p in glob.glob(os.path.join(os.path.expanduser(claude_home),"projects","**","*.jsonl"),recursive=True)]
+files += [(p,"claude") for p in glob.glob(os.path.join(os.path.expanduser(claude_home),"projects","**","*.jsonl"),recursive=True)
+          if not os.path.basename(p).startswith("agent-")]
 def mt(it):
     try: return os.path.getmtime(it[0])
     except OSError: return 0
 files=[f for f in files if mt(f)>=cutoff]
 files.sort(key=mt,reverse=True)
 files=files[:limit]
+_seen=set()
 for path,cli in files:
     cwd=""; sid=os.path.splitext(os.path.basename(path))[0]; title=""
     for l in head_lines(path):
@@ -280,6 +302,9 @@ for path,cli in files:
             if not title and o.get("type")=="user" and isinstance(o.get("message"),dict):
                 t=itext(o["message"].get("content",""))
                 if t and not boiler(t): title=t.strip()
+    dk=(cli,sid)
+    if dk in _seen: continue   # one entry per session id (skip resume/subagent dups)
+    _seen.add(dk)
     print(json.dumps({"cli":cli,"cwd":cwd,"session_id":sid,"path":path,
                       "title":(title or "(no prompt yet)")[:120],
                       "mtime_ms":int(mt((path,cli))*1000)}))

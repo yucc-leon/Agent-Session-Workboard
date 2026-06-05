@@ -352,6 +352,13 @@ def create_app(config: Config) -> FastAPI:
         conv = registry.find_conversation(machine, cli, session_id)
         if not conv:
             return JSONResponse({"error": "not found"}, status_code=404)
+
+        # Idempotent: if this conversation is already running in a tmux session,
+        # just hand back that one instead of spawning another '-resume' clone.
+        existing = _conv_live_name(conv)
+        if existing:
+            return {"ok": True, "machine": machine, "name": existing, "reused": True}
+
         tmux = registry.tmux_for(machine)
         if not tmux:
             return JSONResponse({"error": "unknown machine"}, status_code=404)
@@ -359,13 +366,12 @@ def create_app(config: Config) -> FastAPI:
             command = f"claude --resume {session_id}"
         else:
             command = f"codex resume {session_id}"
-        name = _safe_name(f"{conv.project}-{conv.cli}-resume")
-        base, i = name, 2
-        while tmux.has_session(name):
-            name = f"{base}-{i}"
-            i += 1
+        # Clean, stable name derived from the project + short id (no '-resume'
+        # suffix piling up). Reused on repeat because has_session matches it.
+        name = _safe_name(f"{conv.project or conv.cli}-{session_id[:6]}")
         try:
-            tmux.new_session(name, conv.cwd or ".", command)
+            if not tmux.has_session(name):
+                tmux.new_session(name, conv.cwd or ".", command)
         except Exception as e:
             return JSONResponse({"error": str(e)}, status_code=500)
         registry.list(refresh=True)
