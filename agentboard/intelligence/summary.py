@@ -15,6 +15,7 @@ when its transcript actually grew.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,7 +23,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field, ValidationError
 
 from agentboard.config import Config
-from agentboard.core.transcript import TranscriptState
+from agentboard.core.transcript import TranscriptMessage, TranscriptState
 from agentboard.intelligence.llm import LLMClient
 from agentboard.logging import get_logger
 from agentboard.redaction import redact_text
@@ -125,10 +126,47 @@ def _save_card(config: Config, key: str, card: SessionCard) -> None:
 # ---------------------------------------------------------------------------
 
 _TITLE_SYSTEM = (
-    "Give a concise title for a coding-agent conversation: at most 6 words, "
-    "no surrounding quotes, no trailing punctuation. Use the conversation's "
-    "language. Reply with ONLY the title."
+    "Give a concise title for a coding-agent conversation: at most 8 words, "
+    "no surrounding quotes, no trailing punctuation. Capture what the work is "
+    "actually about (favor the latest direction over the opening line). Use the "
+    "conversation's language. Reply with ONLY the title."
 )
+
+
+def title_seed(state: TranscriptState) -> str:
+    """A small, representative sample of a conversation for titling.
+
+    Not the full transcript — we sample user turns at the head, middle and tail
+    (weighted toward the tail, since a conversation's current focus matters most
+    for a title) plus the latest agent reply for context. Keeps input tiny.
+    """
+    users = [m for m in state.messages if m.role == "user" and m.text.strip()]
+    if not users:
+        # No user turns parsed — fall back to whatever text we have.
+        return (state.reply or "").strip()[:600]
+
+    picked: list[TranscriptMessage] = []
+    seen: set[int] = set()
+
+    def add(m: TranscriptMessage) -> None:
+        if id(m) not in seen:
+            seen.add(id(m))
+            picked.append(m)
+
+    add(users[0])                              # the original ask
+    if len(users) >= 5:
+        add(users[len(users) // 2])            # something from the middle
+    for m in users[-3:]:                       # the recent focus (bias to tail)
+        add(m)
+
+    parts = [f"User: {m.text.strip()[:400]}" for m in picked]
+    agents = [m for m in state.messages if m.role == "agent" and m.text.strip()]
+    if agents:
+        parts.append(f"Agent (latest): {agents[-1].text.strip()[:300]}")
+    return "\n".join(parts)[:2000]
+
+
+_TITLE_LOCK = asyncio.Lock()
 
 
 def _titles_path(config: Config) -> Path:
@@ -150,21 +188,21 @@ def cached_title(config: Config, key: str) -> str | None:
 
 
 async def quick_title(
-    config: Config, key: str, seed_text: str, *, force: bool = False
+    config: Config, key: str, state: TranscriptState, *, force: bool = False
 ) -> str | None:
-    """A cheap LLM title from a short seed (usually the first user message).
+    """A cheap LLM title from a head/middle/tail sample of the conversation.
 
-    Cached once per session — the opening message doesn't change, so we don't
-    refingerprint. Heavy enough to be worth caching, cheap enough to run across
-    a whole list. Returns None if no LLM is configured or the seed is empty.
+    Far cheaper than a full card (tiny sampled input, short output), but richer
+    than the opening line alone — so conversations that start with "继续"/"ok"
+    still get a meaningful title. Cached; returns None if no LLM or no content.
     """
-    seed = (seed_text or "").strip()
-    if not seed:
-        return None
     if not force:
         existing = cached_title(config, key)
         if existing:
             return existing
+    seed = title_seed(state).strip()
+    if not seed:
+        return None
 
     client = LLMClient(config.llm)
     if not client.available:
@@ -172,7 +210,7 @@ async def quick_title(
     result = await client.chat(
         [
             {"role": "system", "content": _TITLE_SYSTEM},
-            {"role": "user", "content": redact_text(seed[:800])},
+            {"role": "user", "content": redact_text(seed)},
         ],
         # Generous enough that reasoning models (which spend the budget thinking
         # before emitting) still have room to produce the short title. Input and
@@ -186,14 +224,19 @@ async def quick_title(
     if not title:
         return None
 
-    titles = _load_titles(config)
-    titles[key] = title
-    path = _titles_path(config)
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(titles, ensure_ascii=False, indent=2), encoding="utf-8")
-    except OSError as e:
-        logger.warning("Could not write title cache: %s", e)
+    # Serialize the read-modify-write so concurrent titling doesn't clobber the
+    # cache file (the batch endpoint titles several conversations at once).
+    async with _TITLE_LOCK:
+        titles = _load_titles(config)
+        titles[key] = title
+        path = _titles_path(config)
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                json.dumps(titles, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+        except OSError as e:
+            logger.warning("Could not write title cache: %s", e)
     return title
 
 

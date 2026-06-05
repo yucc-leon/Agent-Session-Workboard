@@ -299,16 +299,26 @@ def create_app(config: Config) -> FastAPI:
 
         n = count or max(config.summary.recent_count, 40)
         convs = registry.conversations()[:n]
-        done = 0
-        for c in convs:
-            if cached_title(config, c.key) or cached_card(config, c.key):
-                continue
-            try:
-                if await quick_title(config, c.key, c.title):
-                    done += 1
-            except Exception:
-                logger.debug("quick_title failed for %s", c.key, exc_info=True)
-        return {"ok": True, "titled": done, "scanned": len(convs)}
+        todo = [
+            c for c in convs
+            if not (cached_title(config, c.key) or cached_card(config, c.key))
+        ]
+
+        # Each title needs a transcript read + an LLM call (slow on reasoning
+        # models), so run a few concurrently rather than one-at-a-time.
+        sem = asyncio.Semaphore(5)
+
+        async def _title_one(c) -> bool:
+            async with sem:
+                try:
+                    state = await asyncio.to_thread(registry.conversation_transcript, c)
+                    return bool(await quick_title(config, c.key, state))
+                except Exception:
+                    logger.debug("quick_title failed for %s", c.key, exc_info=True)
+                    return False
+
+        results = await asyncio.gather(*[_title_one(c) for c in todo])
+        return {"ok": True, "titled": sum(results), "scanned": len(convs)}
 
     @app.get("/api/conversations/{machine}/{cli}/{session_id}/transcript")
     async def api_conv_transcript(machine: str, cli: str, session_id: str):

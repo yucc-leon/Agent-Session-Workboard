@@ -33,10 +33,10 @@ machines:
 # Optional — everything else works without it.
 llm:
   provider: openai_compatible
-  model: deepseek-chat
+  model: deepseek-v4-flash
   base_url: https://api.deepseek.com
   api_key_env: DEEPSEEK_API_KEY
-  reasoning_effort: medium
+  reasoning_effort: ""
 
 # Remote access. When enabled the server binds bind_host and requires the token.
 remote:
@@ -77,7 +77,7 @@ class MachineConfig(BaseModel):
 
 class LLMConfig(BaseModel):
     provider: str = "openai_compatible"
-    model: str = "deepseek-chat"
+    model: str = "deepseek-v4-flash"
     base_url: str = "https://api.deepseek.com"
     api_key_env: str = "DEEPSEEK_API_KEY"
     api_key: str | None = None
