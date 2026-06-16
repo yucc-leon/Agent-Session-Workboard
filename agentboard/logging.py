@@ -1,4 +1,4 @@
-"""Logging setup for Agent Session Workboard."""
+"""Logging setup for AgentBoard."""
 
 import logging
 import sys

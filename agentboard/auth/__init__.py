@@ -1,1 +1,1 @@
-"""Authentication module for Agent Session Workboard remote access."""
+"""Authentication module for AgentBoard remote access."""

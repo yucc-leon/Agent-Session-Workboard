@@ -1,4 +1,4 @@
-"""CLI for Agent Session Workboard.
+"""CLI for AgentBoard.
 
 The web UI is the primary surface; these commands cover setup and quick
 terminal-side actions (list / send / new / kill / summarize).
@@ -26,7 +26,7 @@ from agentboard.logging import get_logger
 
 app = typer.Typer(
     name="agentboard",
-    help="Agent Session Workboard — drive your local & remote agent sessions from anywhere.",
+    help="AgentBoard — drive your local & remote agent sessions from anywhere.",
     add_completion=False,
 )
 console = Console()

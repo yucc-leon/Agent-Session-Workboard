@@ -74,7 +74,7 @@ def _render(template: str, **ctx) -> HTMLResponse:
 
 
 def create_app(config: Config) -> FastAPI:
-    app = FastAPI(title="Agent Session Workboard", version="0.3.0")
+    app = FastAPI(title="AgentBoard", version="0.3.0")
     registry = SessionRegistry(config.machines)
 
     # ------------------------------------------------------------------
@@ -171,7 +171,7 @@ def create_app(config: Config) -> FastAPI:
     @app.get("/manifest.json")
     async def manifest():
         return JSONResponse({
-            "name": "Agent Session Workboard",
+            "name": "AgentBoard",
             "short_name": "AgentBoard",
             "start_url": "/",
             "display": "standalone",

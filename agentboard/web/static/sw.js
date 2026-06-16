@@ -1,4 +1,4 @@
-/* Agent Session Workboard — Service Worker (PWA)
+/* AgentBoard — Service Worker (PWA)
 
 Enables:
   - Offline caching

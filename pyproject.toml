@@ -1,7 +1,7 @@
 [project]
 name = "agentboard"
 version = "0.3.0"
-description = "Agent Session Workboard — a bearer-token web hub to drive your local & remote agent (Codex/Claude) tmux sessions from anywhere"
+description = "AgentBoard — a bearer-token web hub to drive your local & remote agent (Codex/Claude) tmux sessions from anywhere"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }

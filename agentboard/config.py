@@ -1,4 +1,4 @@
-"""Configuration loading for Agent Session Workboard."""
+"""Configuration loading for AgentBoard."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import yaml
 from pydantic import BaseModel, Field
 
 DEFAULT_CONFIG_YAML = """\
-# Agent Session Workboard configuration
+# AgentBoard configuration
 workspace:
   data_dir: ~/.agentboard
 

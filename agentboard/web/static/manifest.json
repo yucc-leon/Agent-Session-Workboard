@@ -1,5 +1,5 @@
 {
-    "name": "Agent Session Workboard",
+    "name": "AgentBoard",
     "short_name": "AgentBoard",
     "description": "本地优先的 session/worktree 状态索引器与总控台",
     "start_url": "/",
