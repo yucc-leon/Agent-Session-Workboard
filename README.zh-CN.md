@@ -80,7 +80,7 @@ machines:
     claude_home: ~/.claude
     tmux: true
 
-llm:                    # 可选 —— 只用于标题和总结
+llm:                    # 可选:只用于标题和总结
   base_url: https://api.deepseek.com
   model: deepseek-v4-flash
   api_key_env: DEEPSEEK_API_KEY

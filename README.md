@@ -2,7 +2,7 @@
 
 *[English](README.md) · [中文](README.zh-CN.md)*
 
-I leave Codex and Claude Code running on my Mac and then walk away from it.
+I leave Codex and Claude Code running on my Mac and walk away.
 AgentBoard is how I check in from my phone: see what the agents are doing, type
 a reply, or pull up something I ran last week and keep going. That's really all
 it's for.
@@ -100,7 +100,7 @@ machines:
     claude_home: ~/.claude
     tmux: true
 
-llm:                    # optional — only used for titles & summaries
+llm:                    # optional: only for titles & summaries
   base_url: https://api.deepseek.com
   model: deepseek-v4-flash
   api_key_env: DEEPSEEK_API_KEY
