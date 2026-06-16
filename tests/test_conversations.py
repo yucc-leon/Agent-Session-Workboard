@@ -4,9 +4,25 @@ import json
 
 from agentboard.core.conversations import (
     _REMOTE_SCAN_BODY,
+    _clean_title,
+    _looks_like_boilerplate,
     cli_for_cwd,
     discover_conversations,
 )
+
+
+def test_clean_title_first_sentence_no_markdown():
+    assert _clean_title("# AGENTS.md instructions\nblah") == "AGENTS.md instructions"
+    assert _clean_title("帮我调整 CSS 样式。然后再改字体") == "帮我调整 CSS 样式。"
+    assert _clean_title("Fix the login bug. It 500s.") == "Fix the login bug."
+    assert _clean_title("> - * quoted list item") == "quoted list item"
+
+
+def test_boilerplate_rejects_injected_context_and_json():
+    assert _looks_like_boilerplate("# AGENTS.md instructions for /x")
+    assert _looks_like_boilerplate('{"role": "system", "content": "a long json payload here"}')
+    assert _looks_like_boilerplate("<command-name>foo")
+    assert not _looks_like_boilerplate("帮我写个脚本")
 
 
 def _write(path, lines):

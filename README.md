@@ -66,8 +66,10 @@ The dashboard has two tiers:
 - **🟢 Live now** — agents currently running in tmux (local or SSH). Drive them
   directly: read, send messages, interrupt.
 - **💬 Conversations** — your full Codex/Claude history from their JSONL logs,
-  across every project, with LLM-generated titles (auto, cached). **Just type to
-  continue** — sending a message revives a closed conversation into a live tmux
+  across every project. Titles are **LLM-generated when an LLM is configured**
+  (auto, cached); without one they fall back to the first sentence of your
+  opening message. **Just type to continue** — sending a message revives a
+  closed conversation into a live tmux
   session and delivers your message; no separate "Resume" step. A conversation
   that's already live links straight to its operate page.
 

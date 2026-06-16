@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -87,8 +88,32 @@ def _iter_text(blocks) -> str:
 
 def _looks_like_boilerplate(text: str) -> bool:
     t = text.strip().lower()
-    return t.startswith(("<command-name>", "<command-message>", "<local-command",
-                         "<environment_context>", "caveat:")) or len(t) < 2
+    if t.startswith(("<command-name>", "<command-message>", "<local-command",
+                     "<environment_context>", "caveat:", "# agents.md")):
+        return True
+    # A JSON/data payload injected as the first turn — not a human prompt.
+    if t.startswith(("{", "[")) and len(t) > 40:
+        return True
+    return len(t) < 2
+
+
+_TITLE_STRIP = re.compile(r"^[\s>#*`\-]+")
+# Split after a CJK terminator (no trailing space in Chinese), or an ASCII one
+# followed by whitespace/end — so "AGENTS.md" / "1.7B" don't split.
+_SENTENCE_END = re.compile(r"(?<=[。！？])|(?<=[.!?])(?=\s|$)")
+
+
+def _clean_title(text: str) -> str:
+    """A readable list label: the first real sentence of the user's message,
+    minus leading markdown/quote/list markers. This is the fallback shown when
+    no LLM is configured (the LLM quick-title supersedes it when available)."""
+    t = text.strip()
+    for line in t.splitlines():           # first non-empty, de-marked line
+        line = _TITLE_STRIP.sub("", line).strip()
+        if line:
+            t = line
+            break
+    return _SENTENCE_END.split(t, maxsplit=1)[0].strip()[:80] if t else ""
 
 
 def _codex_meta(path: Path) -> Conversation | None:
@@ -119,7 +144,7 @@ def _codex_meta(path: Path) -> Conversation | None:
                     if role == "user" or ptype == "user_command":
                         t = _iter_text(payload.get("content", payload.get("text", "")))
                         if t and not _looks_like_boilerplate(t):
-                            title = t.strip()
+                            title = _clean_title(t)
     except OSError:
         return None
     if not session_id:
@@ -157,7 +182,7 @@ def _claude_meta(path: Path) -> Conversation | None:
                 if not title and o.get("type") == "user" and isinstance(o.get("message"), dict):
                     t = _iter_text(o["message"].get("content", ""))
                     if t and not _looks_like_boilerplate(t):
-                        title = t.strip()
+                        title = _clean_title(t)
     except OSError:
         return None
     return Conversation(
@@ -268,7 +293,16 @@ def itext(blocks):
 
 def boiler(t):
     t=t.strip().lower()
-    return t.startswith(("<command-name>","<command-message>","<local-command","<environment_context>","caveat:")) or len(t)<2
+    if t.startswith(("<command-name>","<command-message>","<local-command","<environment_context>","caveat:","# agents.md")): return True
+    if t[:1] in ("{","[") and len(t)>40: return True
+    return len(t)<2
+
+import re as _re
+def clean(t):
+    for line in t.splitlines():
+        line=_re.sub(r"^[\s>#*`\-]+","",line).strip()
+        if line: t=line; break
+    return _re.split(r"(?<=[。！？])|(?<=[.!?])(?=\s|$)",t,1)[0].strip()[:80]
 
 files=[]
 for sub in ("sessions","rollouts"):
@@ -295,13 +329,13 @@ for path,cli in files:
                 cwd=p.get("cwd",cwd); sid=p.get("id",sid)
             if not title and (p.get("role")=="user" or p.get("type")=="user_command"):
                 t=itext(p.get("content",p.get("text","")))
-                if t and not boiler(t): title=t.strip()
+                if t and not boiler(t): title=clean(t)
         else:
             if not cwd and o.get("cwd"): cwd=o["cwd"]
             if o.get("sessionId"): sid=o["sessionId"]
             if not title and o.get("type")=="user" and isinstance(o.get("message"),dict):
                 t=itext(o["message"].get("content",""))
-                if t and not boiler(t): title=t.strip()
+                if t and not boiler(t): title=clean(t)
     dk=(cli,sid)
     if dk in _seen: continue   # one entry per session id (skip resume/subagent dups)
     _seen.add(dk)
