@@ -58,13 +58,13 @@
 <div class="composer" style="position:sticky; bottom:0; padding:12px 0; background:var(--bg); margin-top:8px;">
     <div style="display:flex; gap:8px;">
         <textarea id="cont-input" class="form-input" rows="2"
-                  placeholder="接着说…（Enter 发送，自动 resume 进 tmux 并跳到实时终端）"
+                  placeholder="Type to continue — Enter to send (auto-resumes into tmux and opens the live terminal)"
                   style="resize:vertical; font-family:inherit;"></textarea>
         <button class="btn btn-primary" id="cont-send" onclick="continueHere()">Send ▸</button>
     </div>
     <div class="hint" style="margin-top:4px;">
-        {% if conv.live_tmux %}已在运行，直接发送给实时会话。
-        {% else %}发送即自动 resume，无需先点 Resume。{% endif %}
+        {% if conv.live_tmux %}Already running — your message goes straight to the live session.
+        {% else %}Sending auto-resumes this conversation — no need to hit Resume first.{% endif %}
     </div>
 </div>
 

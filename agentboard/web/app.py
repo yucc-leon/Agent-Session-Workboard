@@ -173,10 +173,11 @@ def create_app(config: Config) -> FastAPI:
         return JSONResponse({
             "name": "AgentBoard",
             "short_name": "AgentBoard",
+            "description": "Drive your Codex / Claude Code sessions from anywhere",
             "start_url": "/",
             "display": "standalone",
-            "background_color": "#0d1117",
-            "theme_color": "#0d1117",
+            "background_color": "#f5f1ea",
+            "theme_color": "#f5f1ea",
             "icons": [],
         })
 

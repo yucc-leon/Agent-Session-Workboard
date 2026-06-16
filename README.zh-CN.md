@@ -4,13 +4,13 @@
 
 在任何浏览器(包括手机)上,驱动你机器上——以及它经 SSH 连过去的远程机器上——正在跑的 Codex / Claude Code 会话。看 agent 在干什么、打字回它、把一个旧对话从中断的地方接着跟下去。
 
-![仪表盘](docs/screenshots/dashboard.png)
+![仪表盘](docs/screenshots/dashboard-zh.png)
 
 ## 是什么
 
 一个管理 AI 编码 agent 会话的小型 web hub。一个会话,就是**一个跑着 agent CLI 的 tmux pane**;AgentBoard 把它们(本地的和 SSH 远程的)连同你过往的 Codex / Claude 对话一起,按项目列出来。打开一个对话,直接接着打字就行。配上 LLM 后,每个对话还会有一个标题和一张**恢复卡片**——当前进展、下一步、可能漏掉的事项——几秒钟就能找回上下文。
 
-![恢复卡片](docs/screenshots/recovery-card.png)
+![恢复卡片](docs/screenshots/recovery-card-zh.png)
 
 ## 怎么运作
 
@@ -36,7 +36,7 @@ uv run agentboard web --remote
 
 它会对外绑定,并打印出 token、访问 URL,还有一个**能扫的二维码**——手机相机一扫就登录(token 存成 cookie 保留 30 天,每台设备扫一次即可)。之后所有路由都要带 token。`agentboard token` 随时重新打印,`agentboard token --rotate` 换一个新的。端口用什么方式暴露都行——Tailscale、`cloudflared`、SSH 反向隧道。
 
-<img src="docs/screenshots/mobile.png" width="300" alt="手机端仪表盘">
+<img src="docs/screenshots/mobile-zh.png" width="300" alt="手机端仪表盘">
 
 > **延迟:** 同一 WiFi 下很跟手;跨网络(另一个 WiFi、蜂窝)会慢一些,走中继更慢。这只影响控制通道的手感——agent 在主机上干活的速度不受影响。
 
