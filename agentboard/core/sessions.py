@@ -162,7 +162,7 @@ def classify_pane(command: str, cwd: str, *, local: bool,
 class Session:
     """An addressable agent (or shell) session on one machine."""
 
-    machine: str          # config machine name, e.g. "local" or "ascend-rl"
+    machine: str          # config machine name, e.g. "local" or "gpu-box"
     machine_type: str     # "local" | "ssh"
     host: str | None      # ssh host for remote machines
     name: str             # tmux session name — the addressing key within a machine
