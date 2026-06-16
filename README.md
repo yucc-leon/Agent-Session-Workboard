@@ -44,6 +44,14 @@ With `--remote`, **every** route requires the token (pages redirect to a login,
 `/api` and the WebSocket return 401). The token is generated once and saved back
 into your config.
 
+> **Latency note (tested across networks):** on the same Wi-Fi/LAN it's snappy.
+> Across different networks (another Wi-Fi, cellular) responses are noticeably
+> slower — and slower still if traffic goes through a relay (e.g. Tailscale
+> falling back to a DERP relay when direct connection is blocked). This only
+> affects the **control channel** (sending a message, screen refresh); the
+> agent's own work on the host runs at full speed regardless. The chat uses
+> optimistic local echo to soften the lag.
+
 ---
 
 ## What you can do
