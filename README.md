@@ -179,6 +179,12 @@ uv run --extra dev pytest      # core, transcript, summary, auth, web
 uv run --extra dev ruff check
 ```
 
+## Contributing
+
+This started as a personal tool, so the rough edges you hit in real-world use are
+exactly what's most useful to hear about. **Issues, PRs, and ⭐ stars are all
+welcome** — open an issue to report a bug or suggest something, or send a PR.
+
 ## License
 
 MIT
