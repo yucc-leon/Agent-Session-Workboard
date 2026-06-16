@@ -26,6 +26,8 @@ uv run agentboard web --remote
 #    http://0.0.0.0:8765/?token=ab_xxxxxxxx
 ```
 
+它会打印 token、访问 URL,**以及一个可扫描的二维码**——用手机相机扫一下即可立即登录(token 会存成 30 天 cookie,所以每台设备只需扫一次)。token 丢了?随时 `agentboard token` 重新打印(连二维码一起);`agentboard token --rotate` 换一个新的(旧的立即失效)。
+
 然后用你喜欢的方式把端口暴露出去,在手机/笔记本上打开该 URL:
 
 ```bash
@@ -67,6 +69,7 @@ ssh -R 80:localhost:8765 serveo.net          # 简单粗暴
 | `agentboard new <machine> <cwd> [--command codex] [--name x]` | 启动一个会话 |
 | `agentboard kill <machine> <name>` | 关闭一个会话 |
 | `agentboard summarize [-m machine] [-n name]` | 生成 LLM 总结卡片 |
+| `agentboard token [--rotate]` | 打印访问 token + URL + 二维码(或重新生成) |
 | `agentboard web [--port 8765] [--remote]` | 启动 web hub |
 
 ---

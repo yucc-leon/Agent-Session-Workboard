@@ -32,6 +32,11 @@ uv run agentboard web --remote
 #    http://0.0.0.0:8765/?token=ab_xxxxxxxx
 ```
 
+It prints the token, the access URLs, **and a scannable QR code** — point your
+phone's camera at it to log in instantly (the token is saved as a cookie for 30
+days, so you only do this once per device). Lost the token? `agentboard token`
+reprints it (and the QR) anytime; `agentboard token --rotate` issues a new one.
+
 Then expose the port however you like and open the URL on your phone/laptop:
 
 ```bash
@@ -93,6 +98,7 @@ Other things:
 | `agentboard new <machine> <cwd> [--command codex] [--name x]` | Start a session |
 | `agentboard kill <machine> <name>` | Kill a session |
 | `agentboard summarize [-m machine] [-n name]` | Build LLM summary cards |
+| `agentboard token [--rotate]` | Print the access token + URLs + QR (or rotate it) |
 | `agentboard web [--port 8765] [--remote]` | Start the web hub |
 
 ---

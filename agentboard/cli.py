@@ -211,19 +211,8 @@ def web(
         bind = cfg.remote.bind_host
         console.print("[bold yellow]🔐 Remote access enabled[/bold yellow]")
         console.print(f"  Bind:  {bind}:{port}")
-        console.print(f"  Token: [bold green]{token}[/bold green]")
-        ts_ip = _tailscale_ip()
-        if ts_ip:
-            console.print(
-                f"  [bold]Cross-network URL (Tailscale):[/bold] "
-                f"[green]http://{ts_ip}:{port}/?token={token}[/green]"
-            )
-            console.print("  [dim]Open from your phone on any network "
-                          "(Tailscale must be on both devices).[/dim]")
-        else:
-            lan = _lan_ip()
-            if lan:
-                console.print(f"  [dim]Same-network URL: http://{lan}:{port}/?token={token}[/dim]")
+        _print_access(token, port)
+        if not _tailscale_ip():
             console.print("  [dim]Different networks? Install Tailscale here + on your phone "
                           "for a stable cross-network address.[/dim]")
         console.print()
@@ -234,6 +223,38 @@ def web(
 
     app_instance = create_app(cfg)
     uvicorn.run(app_instance, host=bind, port=port, log_level="info")
+
+
+@app.command()
+def token(
+    rotate: Annotated[bool, typer.Option("--rotate", help="Generate a new token")] = False,
+    port: Annotated[int, typer.Option("--port", "-p", help="Port for the access URL")] = 8765,
+    config_path: ConfigOpt = None,
+) -> None:
+    """Show the bearer token + access URLs (and a scannable QR), or rotate it."""
+    from agentboard.auth.middleware import (
+        _save_token_to_config,
+        generate_token,
+        load_or_create_token,
+    )
+
+    cfg = load_config(config_path)
+    config_file = config_path or str(get_default_config_path())
+    if rotate:
+        tok = generate_token()
+        cfg.auth.bearer_token = tok
+        try:
+            _save_token_to_config(config_file, tok)
+            console.print("[green]✓ New token generated and saved.[/green] "
+                          "The old one no longer works.")
+        except Exception as e:  # noqa: BLE001 — best-effort write; token still printed
+            console.print(f"[yellow]Generated, but could not write config ({e}). "
+                          f"Set auth.bearer_token manually.[/yellow]")
+        console.print("[dim]Restart a running server for the new token to take effect.[/dim]")
+    else:
+        tok = load_or_create_token(cfg.auth, config_file)
+    console.print("[bold]🔑 Access[/bold]")
+    _print_access(tok, port)
 
 
 @app.command()
@@ -285,9 +306,54 @@ def _lan_ip() -> str | None:
         s.connect(("8.8.8.8", 80))
         ip = s.getsockname()[0]
         s.close()
-        return ip
     except OSError:
         return None
+    # 198.18.0.0/15 is the range Clash/mihomo TUN hands out for fake-ip — not a
+    # real LAN address, so don't advertise it as a same-network URL.
+    if ip.startswith(("198.18.", "198.19.")):
+        return None
+    return ip
+
+
+def _access_urls(token: str, port: int) -> list[tuple[str, str]]:
+    """Labelled access URLs, best (cross-network) first."""
+    urls: list[tuple[str, str]] = []
+    ts = _tailscale_ip()
+    if ts:
+        urls.append(("Cross-network URL (Tailscale)", f"http://{ts}:{port}/?token={token}"))
+    lan = _lan_ip()
+    if lan:
+        urls.append(("Same-network URL (LAN)", f"http://{lan}:{port}/?token={token}"))
+    return urls
+
+
+def _print_qr(url: str) -> None:
+    """Print a scannable ASCII QR for an access URL (graceful if qrcode absent)."""
+    try:
+        import io
+
+        import qrcode
+    except ImportError:
+        console.print("  [dim](install 'qrcode' to show a scannable QR)[/dim]")
+        return
+    qr = qrcode.QRCode(border=1, error_correction=qrcode.constants.ERROR_CORRECT_L)
+    qr.add_data(url)
+    qr.make(fit=True)
+    buf = io.StringIO()
+    qr.print_ascii(out=buf)
+    console.print(buf.getvalue())
+
+
+def _print_access(token: str, port: int) -> None:
+    """Print the token, access URLs, and a QR of the best URL to scan from a phone."""
+    console.print(f"  Token: [bold green]{token}[/bold green]")
+    urls = _access_urls(token, port)
+    for label, url in urls:
+        console.print(f"  {label}: [green]{url}[/green]")
+    primary = urls[0][1] if urls else f"http://127.0.0.1:{port}/?token={token}"
+    _print_qr(primary)
+    console.print("  [dim]📱 Scan the QR to log in on your phone "
+                  "(saved as a cookie for 30 days).[/dim]")
 
 
 def main() -> None:
